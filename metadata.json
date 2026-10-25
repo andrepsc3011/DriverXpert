@@ -1,0 +1,6 @@
+{
+  "name": "DriverXpert (DX)",
+  "description": "Advanced racing telemetry analysis dashboard with track mapping and lap comparison.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

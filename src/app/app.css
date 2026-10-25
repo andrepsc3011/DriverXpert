@@ -1,0 +1,268 @@
+:root {
+  --brand-cyan: #00e5ff;
+  --bg-dark: #0c0e12;
+  --panel-bg: #161a22;
+  --border-color: rgba(255, 255, 255, 0.05);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-cyan);
+}
+
+.theme-dark #minimapContainer,
+.theme-dark #gCircleContainer {
+  background: #080a0e !important;
+}
+
+.theme-light #minimapContainer,
+.theme-light #gCircleContainer {
+  background: #ffffff !important;
+}
+
+.leaflet-container {
+  background: transparent !important;
+}
+
+/* Force dark theme for Leaflet if satellite isn't used */
+.leaflet-tile-pane {
+  filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+}
+
+/* Prevent image dragging */
+img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Stats animations */
+.stat-value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* D3 Chart Styles */
+.domain {
+  stroke: rgba(255,255,255,0.1) !important;
+}
+
+.tick line {
+  stroke: rgba(255,255,255,0.05) !important;
+}
+
+.tick text {
+  fill: rgba(255,255,255,0.4) !important;
+}
+
+/* ==========================================
+   LIGHT THEME ADAPTATION (Technical Motorsport Gray Palette)
+   ========================================== */
+.theme-light {
+  --brand-cyan: #0284c7;
+  --bg-dark: #e2e8f0;
+  --panel-bg: #ffffff;
+  --border-color: #cbd5e1;
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.theme-light,
+.theme-light main {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.theme-light header {
+  background-color: #11141b !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* All panel containers, cards, and modal bodies in light theme */
+.theme-light .bg-\[\#161a22\],
+.theme-light .bg-\[\#11141b\],
+.theme-light .bg-\[\#121620\],
+.theme-light .bg-\[\#0c0f17\],
+.theme-light .bg-\[\#0c0e12\],
+.theme-light .bg-black\/40,
+.theme-light .bg-black\/50,
+.theme-light .bg-black\/60,
+.theme-light .bg-black\/70,
+.theme-light .bg-black\/30,
+.theme-light .bg-black\/20 {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* Modal Backdrops in Light Theme: Semi-transparent slate-900 with blur */
+.theme-light .fixed.inset-0,
+.theme-light div[class*="fixed inset-0"] {
+  background-color: rgba(15, 23, 42, 0.55) !important;
+  backdrop-filter: blur(6px) !important;
+}
+
+/* Secondary toolbars, tab bars and section headers */
+.theme-light .bg-\[\#11141b\]\/95,
+.theme-light .bg-\[\#11141b\]\/50,
+.theme-light .bg-\[\#11141b\]\/30,
+.theme-light .bg-\[\#161a22\]\/80,
+.theme-light .bg-slate-900\/50 {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* Text overrides in light theme */
+.theme-light .text-white,
+.theme-light .text-white\/90,
+.theme-light .text-white\/80 {
+  color: #0f172a !important;
+}
+
+.theme-light .text-white\/70,
+.theme-light .text-white\/60,
+.theme-light .text-white\/50 {
+  color: #334155 !important;
+}
+
+.theme-light .text-white\/40,
+.theme-light .text-white\/30,
+.theme-light .text-white\/20,
+.theme-light .text-white\/10 {
+  color: #64748b !important;
+}
+
+/* Border overrides in light theme */
+.theme-light .border-white\/5,
+.theme-light .border-white\/10,
+.theme-light .border-white\/20,
+.theme-light .border-white\/30,
+.theme-light .border-white\/40 {
+  border-color: #cbd5e1 !important;
+}
+
+/* Inputs, Selects and Badges */
+.theme-light select,
+.theme-light input[type="text"],
+.theme-light input[type="number"] {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.theme-light select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Navigation tabs in light theme */
+.theme-light button[class*="border-r"] {
+  border-color: #cbd5e1 !important;
+  color: #475569 !important;
+}
+
+.theme-light button[class*="border-r"]:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.theme-light button[class*="border-b-brand-cyan"] {
+  background-color: #ffffff !important;
+  color: #0284c7 !important;
+  border-bottom-color: #0284c7 !important;
+}
+
+/* Tables in light theme */
+.theme-light table thead tr,
+.theme-light table thead th {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+  border-color: #cbd5e1 !important;
+}
+
+.theme-light table tbody tr {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+.theme-light table tbody tr:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.theme-light table tfoot tr,
+.theme-light table tfoot td {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.theme-light table th,
+.theme-light table td {
+  border-color: #e2e8f0 !important;
+}
+
+/* Sidebars in light theme */
+.theme-light aside {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Subtle background fills */
+.theme-light .bg-white\/\[0\.02\],
+.theme-light .bg-white\/\[0\.03\],
+.theme-light .bg-white\/\[0\.04\],
+.theme-light .bg-white\/5,
+.theme-light .bg-white\/10 {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Status Footer */
+.theme-light footer {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #475569 !important;
+}
+
+/* D3 Charts in light theme */
+.theme-light .domain {
+  stroke: #94a3b8 !important;
+}
+
+.theme-light .tick line {
+  stroke: #cbd5e1 !important;
+}
+
+.theme-light .tick text {
+  fill: #475569 !important;
+}
+
+/* Scrollbar in light theme */
+.theme-light .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+}
+
+.theme-light .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #0284c7;
+}
+
+.theme-light .shadow-2xl {
+  box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.12) !important;
+}
+
