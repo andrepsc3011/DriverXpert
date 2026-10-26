@@ -6,6 +6,7 @@
     "start": "node dist/server/server.mjs",
     "dev": "cross-env ng serve --port=3000 --host=0.0.0.0 ${DISABLE_HMR:+--live-reload=false}",
     "build": "ng build",
+    "build:gh-pages": "ng build --configuration production --base-href ./ && cp dist/browser/index.html dist/browser/404.html && mkdir -p docs && cp -r dist/browser/* docs/ && touch docs/.nojekyll",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint": "ng lint"

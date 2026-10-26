@@ -2,7 +2,7 @@ import { Injectable, inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 
 const DB_NAME = 'DriverXpertTelemetryDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_NAME = 'directory_handles';
 const SESSIONS_STORE = 'cached_sessions';
 const HANDLE_KEY = 'telemetry_dir_handle';
@@ -53,7 +53,28 @@ export class DirectoryStorageService {
           db.createObjectStore(SESSIONS_STORE);
         }
       };
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        const db = req.result;
+        // Verify both object stores exist; if not, force a version upgrade
+        if (!db.objectStoreNames.contains(STORE_NAME) || !db.objectStoreNames.contains(SESSIONS_STORE)) {
+          const nextVersion = db.version + 1;
+          db.close();
+          const upgradeReq = indexedDB.open(DB_NAME, nextVersion);
+          upgradeReq.onupgradeneeded = () => {
+            const upDb = upgradeReq.result;
+            if (!upDb.objectStoreNames.contains(STORE_NAME)) {
+              upDb.createObjectStore(STORE_NAME);
+            }
+            if (!upDb.objectStoreNames.contains(SESSIONS_STORE)) {
+              upDb.createObjectStore(SESSIONS_STORE);
+            }
+          };
+          upgradeReq.onsuccess = () => resolve(upgradeReq.result);
+          upgradeReq.onerror = () => reject(upgradeReq.error);
+          return;
+        }
+        resolve(db);
+      };
       req.onerror = () => reject(req.error);
     });
   }
@@ -104,6 +125,7 @@ export class DirectoryStorageService {
   async clearDirectoryHandle(): Promise<void> {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(DIR_NAME_KEY);
+      localStorage.removeItem('dx_saved_sessions_meta');
     }
     await this.clearCachedSessions();
     if (!this.isSupported()) return;
@@ -124,39 +146,77 @@ export class DirectoryStorageService {
   async saveCachedSessions(sessions: unknown[], dirName: string): Promise<void> {
     if (!isPlatformBrowser(this.platformId)) return;
     try {
-      const serializableSessions = (sessions as {
+      const serializableSessions = (sessions as Array<{
         id: string;
         driver: string;
         track: string;
         date: string;
         time: string;
-        laps?: unknown[];
+        laps?: Array<{
+          id: string;
+          driver: string;
+          track: string;
+          date: string;
+          time: string;
+          lapTime: number;
+          points?: unknown[];
+          sectors?: unknown[];
+          isBest?: boolean;
+          isIdeal?: boolean;
+        }>;
         resumeData?: unknown;
         bestLapTime?: number;
         lapCount?: number;
-      }[]).map(s => ({
+      }>).map(s => ({
         id: s.id,
         driver: s.driver,
         track: s.track,
         date: s.date,
         time: s.time,
-        laps: s.laps || [],
+        laps: (s.laps || []).map(l => ({
+          id: l.id,
+          driver: l.driver,
+          track: l.track,
+          date: l.date,
+          time: l.time,
+          lapTime: l.lapTime,
+          points: l.points || [],
+          sectors: l.sectors || [],
+          isBest: l.isBest,
+          isIdeal: l.isIdeal
+        })),
         resumeData: s.resumeData || null,
         bestLapTime: s.bestLapTime,
         lapCount: s.lapCount || (s.laps ? s.laps.length : 0),
         isLoaded: true
       }));
 
+      // Deep clean to pure primitives and arrays (eliminates any non-serializable properties)
+      const sanitized = JSON.parse(JSON.stringify(serializableSessions));
+
       const db = await this.openDB();
       await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(SESSIONS_STORE, 'readwrite');
         const store = tx.objectStore(SESSIONS_STORE);
-        store.put({ sessions: serializableSessions, dirName, timestamp: Date.now() }, SESSIONS_KEY);
+        store.put({ sessions: sanitized, dirName, timestamp: Date.now() }, SESSIONS_KEY);
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error('Transaction aborted'));
       });
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(DIR_NAME_KEY, dirName);
+        try {
+          const sessionMeta = sanitized.map((s: { id: string; driver: string; track: string; date: string; time: string; bestLapTime?: number; lapCount?: number }) => ({
+            id: s.id,
+            driver: s.driver,
+            track: s.track,
+            date: s.date,
+            time: s.time,
+            bestLapTime: s.bestLapTime,
+            lapCount: s.lapCount
+          }));
+          localStorage.setItem('dx_saved_sessions_meta', JSON.stringify(sessionMeta));
+        } catch { /* ignore */ }
       }
     } catch (err) {
       console.warn('Could not save cached sessions to IndexedDB:', err);
@@ -183,6 +243,7 @@ export class DirectoryStorageService {
   async clearCachedSessions(): Promise<void> {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(DIR_NAME_KEY);
+      localStorage.removeItem('dx_saved_sessions_meta');
     }
     if (!isPlatformBrowser(this.platformId)) return;
     try {

@@ -730,23 +730,36 @@
 
                 </div>
 
-                <!-- Google Map with 100% full view -->
-                <div class="flex-1 relative h-full w-full">
-                  <google-map [center]="mapCenter()" [zoom]="15" [options]="mapOptions" height="100%" width="100%">
-                    @for (trace of lapTracePaths(); track $index) {
-                      <map-polyline [path]="trace.path" [options]="trace.options"></map-polyline>
-                    }
-                    @for (marker of syncMarkers(); track $index) {
-                      <map-marker [position]="marker.position" 
-                                  [options]="{ icon: marker.icon }">
-                      </map-marker>
-                    }
-                    @for (marker of extremeMarkers(); track $index) {
-                      <map-marker [position]="marker.position"
-                                  [options]="marker.options">
-                      </map-marker>
-                    }
-                  </google-map>
+                <!-- Esri World Imagery Interactive Motorsport Map (Leaflet) -->
+                <div class="flex-1 relative h-full w-full min-h-[500px]">
+                  <div #leafletMapContainer id="leafletMap" class="w-full h-full min-h-[500px] z-0"></div>
+
+                  <!-- Satellite & Map Layer Switcher at Top Right -->
+                  <div class="absolute top-3 right-3 z-[1000] flex items-center gap-1 bg-black/85 backdrop-blur-md p-1.5 rounded-xl border border-white/15 shadow-2xl text-[10px] font-mono">
+                    <button type="button" 
+                            (click)="setMapTileLayer('esri')"
+                            [title]="'Esri World Imagery (Satélite de Alta Resolução)'"
+                            class="px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                            [class.bg-brand-cyan]="mapTileLayer() === 'esri'"
+                            [class.text-black]="mapTileLayer() === 'esri'"
+                            [class.text-white/70]="mapTileLayer() !== 'esri'"
+                            [class.hover:text-white]="mapTileLayer() !== 'esri'">
+                      <mat-icon class="!text-xs !w-3.5 !h-3.5">satellite_alt</mat-icon>
+                      <span>Satélite</span>
+                    </button>
+
+                    <button type="button" 
+                            (click)="setMapTileLayer('osm')"
+                            [title]="'OpenStreetMap (Mapa Padrão de Ruas)'"
+                            class="px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                            [class.bg-brand-cyan]="mapTileLayer() === 'osm'"
+                            [class.text-black]="mapTileLayer() === 'osm'"
+                            [class.text-white/70]="mapTileLayer() !== 'osm'"
+                            [class.hover:text-white]="mapTileLayer() !== 'osm'">
+                      <mat-icon class="!text-xs !w-3.5 !h-3.5">map</mat-icon>
+                      <span>Padrão</span>
+                    </button>
+                  </div>
 
                   <!-- Dynamic Map Legend at Bottom Left -->
                   <div class="absolute bottom-4 left-4 z-10 flex flex-col gap-2 pointer-events-none">
@@ -3242,15 +3255,10 @@
             </div>
           </div>
 
-          <!-- Remember Me Checkbox -->
-          <div class="flex items-center justify-between text-xs pt-0.5">
-            <label class="flex items-center gap-2 cursor-pointer text-white/70 hover:text-white transition-colors text-[11px] select-none">
-              <input type="checkbox"
-                     [checked]="loginRememberMe()"
-                     (change)="onLoginRememberChange($event)"
-                     class="w-3.5 h-3.5 rounded bg-[#181d27] border-white/20 text-brand-cyan focus:ring-0 cursor-pointer">
-              <span>{{ t('auth.remember') }}</span>
-            </label>
+          <!-- Security Notice: Login required on each session -->
+          <div class="flex items-center gap-1.5 text-[10px] font-mono text-white/50 pt-0.5">
+            <mat-icon class="!text-xs !w-3 !h-3 text-brand-cyan">lock</mat-icon>
+            <span>Autenticação ativa: login obrigatório a cada acesso</span>
           </div>
 
           <!-- Error Message Alert -->

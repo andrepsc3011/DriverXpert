@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal, computed, PLATFORM_ID, AfterViewInit, ElementRef, effect, viewChild, untracked } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
-import { GoogleMapsModule, GoogleMap } from '@angular/google-maps';
 import { TelemetryService } from './telemetry.service';
 import { TrackService } from './track.service';
 import { I18nService } from './i18n.service';
@@ -9,6 +8,8 @@ import { ThemeService } from './theme.service';
 import { DirectoryStorageService, FileEntryItem } from './directory-storage.service';
 import { AuthService } from './auth.service';
 import { Lap, TelemetryPoint, SectorData, SessionItem, TreeDateNode, TreeTrackNode, TreeDriverNode, SessionFileItem, SelectorOption, DeltaSegment, DeltaComparisonData, RealtimeDeltaSnapshot, DeltaPoint, CornerData, CornerMetrics } from './models';
+
+import type * as L_TYPES from 'leaflet';
 
 // Using a WeakMap to store non-serializable D3 objects and instances
 // to prevent serialization/cloning errors.
@@ -36,6 +37,15 @@ const APP_INTERNAL_STATE = new WeakMap<App, {
   d3: any;
   chartInstances: ChartInstance[];
   gCircleSvg: any;
+  leafletMap?: L_TYPES.Map;
+  leafletL?: typeof L_TYPES;
+  baseLayers?: {
+    esri: L_TYPES.TileLayer;
+    osm: L_TYPES.TileLayer;
+  };
+  traceLayerGroup?: L_TYPES.LayerGroup;
+  markersLayerGroup?: L_TYPES.LayerGroup;
+  extremaLayerGroup?: L_TYPES.LayerGroup;
 }>();
 
 const LAP_COLORS = [
@@ -56,7 +66,7 @@ const LAP_COLORS = [
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, MatIconModule, GoogleMapsModule],
+  imports: [CommonModule, MatIconModule],
   templateUrl: './app.html',
   styleUrl: './app.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -71,9 +81,9 @@ export class App implements OnInit, AfterViewInit {
   authService = inject(AuthService);
 
   // Authentication & Login Modal State
-  loginUsername = signal<string>('admin');
+  loginUsername = signal<string>('');
   loginPassword = signal<string>('');
-  loginRememberMe = signal<boolean>(true);
+  loginRememberMe = signal<boolean>(false);
   loginErrorMessage = signal<string>('');
   loginIsSubmitting = signal<boolean>(false);
   loginShowPassword = signal<boolean>(false);
@@ -122,8 +132,7 @@ export class App implements OnInit, AfterViewInit {
     setTimeout(() => {
       const result = this.authService.login(
         this.loginUsername(),
-        this.loginPassword(),
-        this.loginRememberMe()
+        this.loginPassword()
       );
       this.loginIsSubmitting.set(false);
       if (!result.success) {
@@ -201,7 +210,7 @@ export class App implements OnInit, AfterViewInit {
   private gCircleContainer = viewChild<ElementRef>('gCircleContainer');
   private deltaTabChartContainer = viewChild<ElementRef>('deltaTabChart');
   private deltaSpeedChartContainer = viewChild<ElementRef>('deltaSpeedChart');
-  private googleMap = viewChild(GoogleMap);
+  private leafletMapContainer = viewChild<ElementRef>('leafletMapContainer');
   private dirPickerInput = viewChild<ElementRef<HTMLInputElement>>('dirPickerInput');
 
   chartOrder = signal<string[]>(['speed', 'braking', 'latAccel', 'longAccel', 'altitude']);
@@ -2021,22 +2030,203 @@ export class App implements OnInit, AfterViewInit {
   mapHeight = signal(600);
   chartHeight = signal(600);
 
-  mapCenter = signal<google.maps.LatLngLiteral>({ lat: -22.8447, lng: -46.7761 });
-  mapOptions: google.maps.MapOptions = {
-    mapTypeId: 'satellite',
-    tilt: 0,
-    mapId: 'DEMO_MAP_ID',
-    mapTypeControl: false,
-    streetViewControl: false,
-    fullscreenControl: false,
-    styles: [
-      {
-        featureType: 'all',
-        elementType: 'labels',
-        stylers: [{ visibility: 'off' }]
+  mapCenter = signal<{ lat: number; lng: number }>({ lat: -22.8447, lng: -46.7761 });
+  mapTileLayer = signal<'esri' | 'osm'>('esri');
+
+  setMapTileLayer(layer: 'esri' | 'osm') {
+    this.mapTileLayer.set(layer);
+    const state = APP_INTERNAL_STATE.get(this);
+    if (!state || !state.leafletMap || !state.baseLayers) return;
+
+    const { leafletMap, baseLayers } = state;
+    if (leafletMap.hasLayer(baseLayers.esri)) leafletMap.removeLayer(baseLayers.esri);
+    if (leafletMap.hasLayer(baseLayers.osm)) leafletMap.removeLayer(baseLayers.osm);
+
+    if (layer === 'osm') baseLayers.osm.addTo(leafletMap);
+    else baseLayers.esri.addTo(leafletMap);
+  }
+
+  async initOrUpdateLeafletMap() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    const containerRef = this.leafletMapContainer();
+    if (!containerRef || !containerRef.nativeElement) return;
+    const container = containerRef.nativeElement;
+
+    let state = APP_INTERNAL_STATE.get(this);
+    if (!state) {
+      state = { d3: null, chartInstances: [], gCircleSvg: null };
+      APP_INTERNAL_STATE.set(this, state);
+    }
+
+    if (!state.leafletL) {
+      const leafletModule = await import('leaflet');
+      const mod = leafletModule as unknown as { default?: typeof L_TYPES };
+      state.leafletL = mod.default || (leafletModule as unknown as typeof L_TYPES);
+    }
+    const L = state.leafletL as typeof L_TYPES;
+
+    if (!state.leafletMap) {
+      const map = L.map(container, {
+        center: [-22.8447, -46.7761],
+        zoom: 15,
+        zoomControl: true,
+        attributionControl: false
+      });
+
+      L.control.attribution({ position: 'bottomright', prefix: false }).addTo(map);
+
+      // 1. Esri World Imagery (Satellite) - default
+      const esriLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        attribution: 'Esri &bull; Earthstar &bull; GIS Community'
+      });
+
+      // 2. OpenStreetMap Standard (Padrão Ruas)
+      const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      });
+
+      state.baseLayers = { esri: esriLayer, osm: osmLayer };
+
+      const current = this.mapTileLayer();
+      if (current === 'osm') osmLayer.addTo(map);
+      else esriLayer.addTo(map);
+
+      state.traceLayerGroup = L.layerGroup().addTo(map);
+      state.extremaLayerGroup = L.layerGroup().addTo(map);
+      state.markersLayerGroup = L.layerGroup().addTo(map);
+
+      state.leafletMap = map;
+    }
+
+    state.leafletMap?.invalidateSize();
+    this.renderLeafletTraces();
+    this.renderLeafletExtrema();
+    this.renderLeafletSyncMarkers();
+    this.centerLeafletMap();
+  }
+
+  renderLeafletTraces() {
+    const state = APP_INTERNAL_STATE.get(this);
+    if (!state || !state.leafletMap || !state.traceLayerGroup || !state.leafletL) return;
+    const L = state.leafletL as typeof L_TYPES;
+    const group = state.traceLayerGroup;
+    group.clearLayers();
+
+    const traces = this.lapTracePaths();
+    traces.forEach(t => {
+      if (t.path && t.path.length >= 2) {
+        const latlngs: L_TYPES.LatLngExpression[] = t.path.map((p: { lat: number; lng: number }) => [p.lat, p.lng]);
+        L.polyline(latlngs, {
+          color: t.options?.strokeColor || '#00e5ff',
+          weight: t.options?.strokeWeight || 4,
+          opacity: t.options?.strokeOpacity || 0.9,
+          lineCap: 'round',
+          lineJoin: 'round',
+          smoothFactor: 1
+        }).addTo(group);
       }
-    ]
-  };
+    });
+  }
+
+  renderLeafletExtrema() {
+    const state = APP_INTERNAL_STATE.get(this);
+    if (!state || !state.leafletMap || !state.extremaLayerGroup || !state.leafletL) return;
+    const L = state.leafletL as typeof L_TYPES;
+    const group = state.extremaLayerGroup;
+    group.clearLayers();
+
+    const extrema = this.extremeMarkers();
+    extrema.forEach(item => {
+      const isMax = item.options?.isMax ?? true;
+      const label = item.options?.labelText || item.options?.label?.text || '';
+      const color = isMax ? '#00e676' : '#ff3e3e';
+      const icon = L.divIcon({
+        className: 'custom-extrema-marker',
+        html: `
+          <div style="transform: translate(-50%, -100%); display: inline-flex; flex-direction: column; align-items: center; pointer-events: none;">
+            <div style="background: rgba(10, 14, 22, 0.94); border: 1.5px solid ${color}; border-radius: 6px; padding: 2px 6px; font-family: monospace; font-size: 9px; font-weight: 800; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.6); white-space: nowrap;">
+              ${label}
+            </div>
+            <div style="width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid ${color};"></div>
+          </div>
+        `,
+        iconSize: [0, 0]
+      });
+      L.marker([item.position.lat, item.position.lng], { icon, interactive: false }).addTo(group);
+    });
+  }
+
+  renderLeafletSyncMarkers() {
+    const state = APP_INTERNAL_STATE.get(this);
+    if (!state || !state.leafletMap || !state.markersLayerGroup || !state.leafletL) return;
+    const L = state.leafletL as typeof L_TYPES;
+    const group = state.markersLayerGroup;
+    group.clearLayers();
+
+    const markers = this.syncMarkers();
+    markers.forEach(m => {
+      if (!m || !m.position) return;
+      const color = m.color || '#00e5ff';
+      const label = m.label || '';
+      const icon = L.divIcon({
+        className: 'custom-sync-marker',
+        html: `
+          <div style="transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; pointer-events: none;">
+            <div style="width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; position: relative;">
+              <div style="position: absolute; width: 26px; height: 26px; border-radius: 50%; background: ${color}; opacity: 0.3; animation: pulse 2s infinite;"></div>
+              <div style="width: 14px; height: 14px; border-radius: 50%; background: ${color}; border: 2.5px solid #ffffff; box-shadow: 0 0 10px ${color};"></div>
+            </div>
+            ${label ? `<div style="background: rgba(0,0,0,0.85); border: 1px solid ${color}; border-radius: 4px; padding: 1px 4px; font-size: 8px; font-weight: 900; font-family: monospace; color: #fff; margin-top: 2px; white-space: nowrap;">${label}</div>` : ''}
+          </div>
+        `,
+        iconSize: [0, 0]
+      });
+      L.marker([m.position.lat, m.position.lng], { icon, interactive: false }).addTo(group);
+    });
+  }
+
+  centerLeafletMap() {
+    const state = APP_INTERNAL_STATE.get(this);
+    if (!state || !state.leafletMap || !state.leafletL) return;
+    const L = state.leafletL as typeof L_TYPES;
+    const map = state.leafletMap;
+
+    let lapsToCenter: Lap[] = [];
+    const active = this.activeTab();
+    if (active === 'map' || active === 'heatmap') {
+      const refId = this.referenceLapId();
+      const compId = this.comparisonLapId();
+      const all = this.filteredLaps();
+      if (refId) {
+        const l = all.find(x => x.id === refId);
+        if (l) lapsToCenter.push(l);
+      }
+      if (compId && compId !== refId) {
+        const l = all.find(x => x.id === compId);
+        if (l) lapsToCenter.push(l);
+      }
+      if (lapsToCenter.length === 0) lapsToCenter = all;
+    } else {
+      const laps = this.selectedLaps();
+      lapsToCenter = laps.length > 0 ? laps : this.filteredLaps();
+    }
+
+    if (lapsToCenter.length > 0) {
+      const bounds = L.latLngBounds([]);
+      lapsToCenter.forEach(lap => {
+        (lap.points || []).forEach(p => {
+          if (!isNaN(p.lat) && !isNaN(p.lon)) {
+            bounds.extend([p.lat, p.lon]);
+          }
+        });
+      });
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [40, 40] });
+      }
+    }
+  }
 
   lapTracePaths = computed(() => {
     const active = this.activeTab();
@@ -2159,6 +2349,8 @@ export class App implements OnInit, AfterViewInit {
       return {
         position: { lat: p.lat, lng: p.lon },
         options: {
+          isMax: p.isMax,
+          labelText: labelText,
           label: {
             text: labelText,
             color: '#ffffff',
@@ -2416,22 +2608,13 @@ export class App implements OnInit, AfterViewInit {
       
       const dataUrl = `data:image/svg+xml;base64,${btoa(svg)}`;
       
-      let icon: any = dataUrl;
-      if (typeof google !== 'undefined' && google.maps) {
-        icon = {
-          url: dataUrl,
-          scaledSize: { width: 40, height: 40 },
-          anchor: { x: 20, y: 20 }
-        };
-      }
-      
       return {
         position: { lat: closest.lat, lng: closest.lon },
         color: color,
         label: isRef && (active === 'map' || active === 'heatmap') ? 'REF' : 
                isComp && (active === 'map' || active === 'heatmap') ? 'COMP' : 
                `Lap ${this.laps().findIndex(l => l.id === lap.id) + 1}`,
-        icon: icon
+        icon: dataUrl
       };
     }).filter(m => m !== null);
   });
@@ -2707,44 +2890,26 @@ export class App implements OnInit, AfterViewInit {
       }
     });
 
-    // Auto-center map on selected laps / comparison laps
+    // Auto-update Leaflet map when active tab is map/heatmap or traces change
     effect(() => {
       if (!isPlatformBrowser(this.platformId)) return;
       const active = this.activeTab();
-      const map = this.googleMap();
-      if (typeof google === 'undefined') return;
-      
-      let lapsToCenter: Lap[] = [];
       if (active === 'map' || active === 'heatmap') {
-        const refId = this.referenceLapId();
-        const compId = this.comparisonLapId();
-        const all = this.filteredLaps();
-        if (refId) {
-          const l = all.find(x => x.id === refId);
-          if (l) lapsToCenter.push(l);
-        }
-        if (compId && compId !== refId) {
-          const l = all.find(x => x.id === compId);
-          if (l) lapsToCenter.push(l);
-        }
-        if (lapsToCenter.length === 0) lapsToCenter = all;
-      } else {
-        const laps = this.selectedLaps();
-        lapsToCenter = laps.length > 0 ? laps : this.filteredLaps();
+        this.lapTracePaths();
+        this.extremeMarkers();
+        setTimeout(() => {
+          this.initOrUpdateLeafletMap();
+        }, 60);
       }
-      
-      if (lapsToCenter.length > 0 && map) {
-        const bounds = new google.maps.LatLngBounds();
-        lapsToCenter.forEach(lap => {
-          (lap.points || []).forEach(p => {
-            if (!isNaN(p.lat) && !isNaN(p.lon)) {
-              bounds.extend({ lat: p.lat, lng: p.lon });
-            }
-          });
-        });
-        if (!bounds.isEmpty()) {
-          map.fitBounds(bounds);
-        }
+    });
+
+    // Auto-update playback vehicle markers in Leaflet
+    effect(() => {
+      if (!isPlatformBrowser(this.platformId)) return;
+      const active = this.activeTab();
+      if (active === 'map' || active === 'heatmap') {
+        this.syncMarkers();
+        this.renderLeafletSyncMarkers();
       }
     });
   }
@@ -2816,15 +2981,25 @@ export class App implements OnInit, AfterViewInit {
     this.sidebarCollapsed.update(v => !v);
     setTimeout(() => {
       this.renderCharts();
+      const state = APP_INTERNAL_STATE.get(this);
+      if (state && state.leafletMap) state.leafletMap.invalidateSize();
     }, 300);
   }
 
   toggleMapSidebar() {
     this.mapSidebarCollapsed.update(v => !v);
+    setTimeout(() => {
+      const state = APP_INTERNAL_STATE.get(this);
+      if (state && state.leafletMap) state.leafletMap.invalidateSize();
+    }, 200);
   }
 
   adjustMapHeight(delta: number) {
     this.mapHeight.update(h => Math.max(300, Math.min(1000, h + delta)));
+    setTimeout(() => {
+      const state = APP_INTERNAL_STATE.get(this);
+      if (state && state.leafletMap) state.leafletMap.invalidateSize();
+    }, 100);
   }
 
   adjustChartHeight(delta: number) {
@@ -2839,7 +3014,11 @@ export class App implements OnInit, AfterViewInit {
     } else {
       this.activeTab.set(tab);
     }
-    if (tab === 'coaching') {
+    if (tab === 'map' || tab === 'heatmap') {
+      setTimeout(() => {
+        this.initOrUpdateLeafletMap();
+      }, 80);
+    } else if (tab === 'coaching') {
       const pair = this.coachingLapsPair();
       const hasInvalidOrSame = !pair || pair.refLap.id === pair.compLap.id;
       if (!this.hasUserManuallySelectedCoachingLaps() || (hasInvalidOrSame && this.filteredLaps().length >= 2)) {
@@ -4243,6 +4422,8 @@ export class App implements OnInit, AfterViewInit {
     if (!session.isLoaded || !session.laps || session.laps.length === 0) {
       await this.loadSession(session);
       this.profileTree.set(this.buildProfileTree(this.allSessions()));
+      const dir = this.linkedDirectoryName() || 'PROFILES';
+      await this.dirStorageService.saveCachedSessions(this.allSessions(), dir);
     }
 
     this.ensureSessionIdealLap(session);
@@ -4574,8 +4755,12 @@ export class App implements OnInit, AfterViewInit {
 
     if (newSessions.length > 0) {
       // Remove initial placeholder demo session if real files are loaded
-      const existingReal = this.allSessions().filter(s => s.lapFiles && s.lapFiles.length > 0);
-      const merged = [...existingReal, ...newSessions];
+      const existingReal = this.allSessions().filter(s => s.id !== 'FABIO___AUTODROMO DE GOIANIA___2024-08-24___09-31-00');
+      const sessionMapMerged = new Map<string, SessionItem>();
+      for (const s of existingReal) sessionMapMerged.set(s.id, s);
+      for (const s of newSessions) sessionMapMerged.set(s.id, s);
+      const merged = Array.from(sessionMapMerged.values());
+
       this.allSessions.set(merged);
       const tree = this.buildProfileTree(merged);
       this.profileTree.set(tree);
@@ -4594,9 +4779,11 @@ export class App implements OnInit, AfterViewInit {
         this.setTab('resume');
       }
 
-      if (this.linkedDirectoryName()) {
-        await this.dirStorageService.saveCachedSessions(merged, this.linkedDirectoryName()!);
+      const dirToSave = this.linkedDirectoryName() || 'PROFILES';
+      if (!this.linkedDirectoryName()) {
+        this.linkedDirectoryName.set(dirToSave);
       }
+      await this.dirStorageService.saveCachedSessions(merged, dirToSave);
     }
 
     this.isImportingFolder.set(false);

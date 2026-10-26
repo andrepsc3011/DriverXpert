@@ -1,5 +1,4 @@
-import { Injectable, signal, PLATFORM_ID, inject } from '@angular/core';
-import { isPlatformBrowser } from '@angular/common';
+import { Injectable, signal } from '@angular/core';
 
 export interface AuthUser {
   username: string;
@@ -12,13 +11,10 @@ export interface AuthSession {
   timestamp: number;
 }
 
-const STORAGE_KEY = 'dx_auth_session_v1';
-
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
-  private readonly platformId = inject(PLATFORM_ID);
 
   /**
    * Master switch to enable or disable the login screen.
@@ -38,45 +34,16 @@ export class AuthService {
   };
 
   constructor() {
-    this.restoreSession();
-  }
-
-  private restoreSession(): void {
-    if (!isPlatformBrowser(this.platformId)) {
-      this.isAuthenticated.set(true);
-      return;
-    }
-
-    // If authentication is disabled, mark as authenticated directly
+    // Always start unauthenticated when auth is enabled so user and password are ALWAYS requested on page load
     if (!this.isAuthEnabled()) {
       this.isAuthenticated.set(true);
-      return;
+    } else {
+      this.isAuthenticated.set(false);
+      this.currentUser.set(null);
     }
-
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const session = JSON.parse(stored) as AuthSession;
-        if (session && session.user && session.timestamp) {
-          // Check expiration (optional 30 days)
-          const now = Date.now();
-          const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-          if (now - session.timestamp < thirtyDays) {
-            this.currentUser.set(session.user);
-            this.isAuthenticated.set(true);
-            return;
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to restore auth session:', e);
-    }
-
-    this.isAuthenticated.set(false);
-    this.currentUser.set(null);
   }
 
-  login(usernameInput: string, passwordInput: string, remember = true): { success: boolean; error?: string } {
+  login(usernameInput: string, passwordInput: string): { success: boolean; error?: string } {
     const username = (usernameInput || '').trim().toLowerCase();
     const password = (passwordInput || '').trim();
 
@@ -95,40 +62,12 @@ export class AuthService {
       displayName: account.name
     };
 
-    const session: AuthSession = {
-      user,
-      timestamp: Date.now()
-    };
-
-    if (isPlatformBrowser(this.platformId)) {
-      try {
-        const payload = JSON.stringify(session);
-        if (remember) {
-          localStorage.setItem(STORAGE_KEY, payload);
-          sessionStorage.removeItem(STORAGE_KEY);
-        } else {
-          sessionStorage.setItem(STORAGE_KEY, payload);
-          localStorage.removeItem(STORAGE_KEY);
-        }
-      } catch (e) {
-        console.warn('Could not store auth session:', e);
-      }
-    }
-
     this.currentUser.set(user);
     this.isAuthenticated.set(true);
     return { success: true };
   }
 
   logout(): void {
-    if (isPlatformBrowser(this.platformId)) {
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-        sessionStorage.removeItem(STORAGE_KEY);
-      } catch (e) {
-        console.warn('Could not remove auth session:', e);
-      }
-    }
     this.currentUser.set(null);
     this.isAuthenticated.set(false);
   }
@@ -141,7 +80,8 @@ export class AuthService {
     if (!enabled) {
       this.isAuthenticated.set(true);
     } else {
-      this.restoreSession();
+      this.isAuthenticated.set(false);
+      this.currentUser.set(null);
     }
   }
 }

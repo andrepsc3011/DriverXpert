@@ -36,12 +36,8 @@
 }
 
 .leaflet-container {
-  background: transparent !important;
-}
-
-/* Force dark theme for Leaflet if satellite isn't used */
-.leaflet-tile-pane {
-  filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+  background: #0b0e14 !important;
+  font-family: inherit;
 }
 
 /* Prevent image dragging */
