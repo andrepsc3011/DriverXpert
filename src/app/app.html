@@ -11,10 +11,10 @@
       <div class="flex items-center gap-3">
         <!-- Official Logo Branding in High-Contrast Protected Motorsport Badge -->
         <div class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-[#090b0e] shadow-[0_2px_10px_rgba(0,0,0,0.4)] shrink-0">
-          <img src="/logo_dx.png" 
+          <img src="logo_dx.png"
                alt="DriverXpert" 
                class="h-7 object-contain"
-               (error)="$any($event.target).src = '/logo.png'">
+               (error)="$any($event.target).src = 'logo.png'">
         </div>
       </div>
     </div>
@@ -3190,7 +3190,7 @@
         <!-- Header / Logo -->
         <div class="flex flex-col items-center text-center space-y-3 pt-2">
           <div class="px-4 py-2 rounded-2xl bg-[#090b0e] border border-white/10 shadow-lg flex items-center justify-center">
-            <img src="/logo_dx.png" 
+            <img src="logo_dx.png"
                  alt="DriverXpert" 
                  class="h-8 object-contain"
                  (error)="onLogoError($event)">
@@ -3279,38 +3279,6 @@
             <span>{{ loginIsSubmitting() ? t('auth.loggingIn') : t('auth.loginBtn') }}</span>
           </button>
         </form>
-
-        <!-- GitHub Pages Quick Demo Credentials Box -->
-        <div class="pt-4 border-t border-white/5 space-y-2">
-          <div class="flex items-center justify-between text-[10px] font-mono text-white/50">
-            <span class="flex items-center gap-1">
-              <mat-icon class="!text-xs !w-3 !h-3 text-amber-400">help_outline</mat-icon>
-              <span>{{ t('auth.testCredentialsNotice') }}</span>
-            </span>
-          </div>
-
-          <div class="grid grid-cols-2 gap-2 text-[10px] font-mono">
-            <button type="button"
-                    (click)="fillDemoCredentials('admin', 'driverxpert')"
-                    class="p-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-brand-cyan/40 text-left transition-colors cursor-pointer group">
-              <div class="text-brand-cyan font-bold flex items-center justify-between">
-                <span>admin</span>
-                <mat-icon class="!text-[10px] !w-2.5 !h-2.5 opacity-0 group-hover:opacity-100 transition-opacity">north_east</mat-icon>
-              </div>
-              <div class="text-white/40">driverxpert</div>
-            </button>
-
-            <button type="button"
-                    (click)="fillDemoCredentials('piloto', 'telemetria')"
-                    class="p-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-emerald-400/40 text-left transition-colors cursor-pointer group">
-              <div class="text-emerald-400 font-bold flex items-center justify-between">
-                <span>piloto</span>
-                <mat-icon class="!text-[10px] !w-2.5 !h-2.5 opacity-0 group-hover:opacity-100 transition-opacity">north_east</mat-icon>
-              </div>
-              <div class="text-white/40">telemetria</div>
-            </button>
-          </div>
-        </div>
 
       </div>
     </div>

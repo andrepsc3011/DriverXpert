@@ -29,7 +29,8 @@
               },
               {
                 "glob": "**/*",
-                "input": "tracks"
+                "input": "tracks",
+                "output": "tracks"
               }
             ],
             "styles": [

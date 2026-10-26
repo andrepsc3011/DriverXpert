@@ -126,7 +126,7 @@ export class TrackService {
   }
 
   getLap(lapNumber: number): Observable<Lap> {
-    return this.http.get<RawLapPoint[]>(`/tracks/LAP${lapNumber}.json`).pipe(
+    return this.http.get<RawLapPoint[]>(`tracks/LAP${lapNumber}.json`).pipe(
       map((rawPoints) => this.parseRawLapData(rawPoints, `lap-${lapNumber}`))
     );
   }

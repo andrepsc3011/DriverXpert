@@ -115,12 +115,6 @@ export class App implements OnInit, AfterViewInit {
     }
   }
 
-  fillDemoCredentials(user: string, pass: string): void {
-    this.loginUsername.set(user);
-    this.loginPassword.set(pass);
-    this.loginErrorMessage.set('');
-  }
-
   handleLoginSubmit(event?: Event): void {
     if (event) {
       event.preventDefault();
@@ -153,7 +147,7 @@ export class App implements OnInit, AfterViewInit {
   onLogoError(event: Event): void {
     const img = event.target as HTMLImageElement;
     if (img) {
-      img.src = '/logo.png';
+      img.src = 'logo.png';
     }
   }
 
